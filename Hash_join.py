@@ -33,3 +33,7 @@ def hash_join_inner(left, right, key):
                     joined = {**r, **b}     # right fields then left fields
                 out.append(joined)
     return out
+
+L = [{"id":1,"gender":"M"}, {"id":1,"gender":"F"}, {"id":2,"gender":"M"}]
+R = [{"id":1,"age":10}, {"id":2,"age":20}, {"id":3,"age":30}]
+print(hash_join_inner(L, R, "id"))
