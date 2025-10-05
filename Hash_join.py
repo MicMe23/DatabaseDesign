@@ -1,6 +1,9 @@
 
 from collections import defaultdict
 from typing import List, Dict, Iterable
+from pathlib import Path
+import pandas as pd
+import pyarrow.parquet as pq
 
 def hash_join_inner(left, right, key):
     # Requirements :
@@ -8,7 +11,7 @@ def hash_join_inner(left, right, key):
     #  - key exists in both sides; None keys don't match
     #  - duplicate keys produce the cross product of matches for now.
     #  returns: list of merged dicts
-    if len(left) > len(right):
+    if len(left) <= len(right):
         build, probe = (left, right)
     else:
         build, probe = (right, left)
@@ -34,6 +37,24 @@ def hash_join_inner(left, right, key):
                 out.append(joined)
     return out
 
-L = [{"id":1,"gender":"M"}, {"id":1,"gender":"F"}, {"id":2,"gender":"M"}]
-R = [{"id":1,"age":10}, {"id":2,"age":20}, {"id":3,"age":30}]
-print(hash_join_inner(L, R, "id"))
+# Load only needed cols
+yellow = pq.read_table(Path("yellow_tripdata_2025-01.parquet"),
+                       columns=["PULocationID","fare_amount"]).to_pandas()
+green  = pq.read_table(Path("green_tripdata_2025-01.parquet"),
+                       columns=["PULocationID","trip_distance"]).to_pandas()
+
+# Clean + align types
+yellow = yellow.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
+green  = green.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
+
+# (Optional) sample down while testing so it’s fast
+yellow = yellow.sample(min(len(yellow), 50_000), random_state=0)
+green  = green.sample(min(len(green), 50_000), random_state=1)
+
+# Convert to records (list of dicts)
+left_rows  = yellow.to_dict(orient="records")
+right_rows = green.to_dict(orient="records")
+
+joins = hash_join_inner(left_rows, right_rows, "PULocationID")
+print("rows joined:", len(joins))
+print(joins[:3])
