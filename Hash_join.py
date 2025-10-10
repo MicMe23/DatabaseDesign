@@ -8,7 +8,6 @@ import pyarrow.parquet as pq
 def hash_join_inner(left, right, key):
     # Requirements :
     #  - left_rows / right_rows: lists of dicts
-    #  - key exists in both sides; None keys don't match
     #  - duplicate keys produce the cross product of matches for now.
     #  returns: list of merged dicts
     if len(left) <= len(right):
@@ -37,21 +36,22 @@ def hash_join_inner(left, right, key):
                 out.append(joined)
     return out
 
-# Load only needed cols
+# (Optional) Load only needed columns to save memory
+# This dataset is massive
 yellow = pq.read_table(Path("yellow_tripdata_2025-01.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()
 green  = pq.read_table(Path("green_tripdata_2025-01.parquet"),
                        columns=["PULocationID","trip_distance"]).to_pandas()
 
-# Clean + align types
+# (Optional) Clean + align types
 yellow = yellow.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
 green  = green.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
 
-# (Optional) sample down while testing so it’s fast
+# (Optional) making this quicker for solo testing
 yellow = yellow.sample(min(len(yellow), 50_000), random_state=0)
 green  = green.sample(min(len(green), 50_000), random_state=1)
 
-# Convert to records (list of dicts)
+# Convert to records (list of dicts) for consistency
 left_rows  = yellow.to_dict(orient="records")
 right_rows = green.to_dict(orient="records")
 
