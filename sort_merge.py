@@ -18,19 +18,21 @@ def sort_merge_inner (left, right, key):
     list_left = list(left)
     list_right = list(right)
 
+    # Sorting step
     sorted_left = merge_sort(list_left, key)
     sorted_right = merge_sort(list_right, key)
 
     output = []
 
-    # Left Index
+    # Left Index, right index
     li = 0
-
-    # Right Index
     ri = 0
     
+    # Infinite loop to be exited when something bad happens
     outer_loop = True
     while outer_loop:
+        # While left key and right key aren't equal, skip them
+        # skipping is done on the smaller value, assuming both must be sorted
         while not (sorted_left[li].get(key) == sorted_right[ri].get(key)):
             if sorted_left[li].get(key) < sorted_right[ri].get(key):
                 if (li+1) < len(sorted_left):
@@ -48,13 +50,14 @@ def sort_merge_inner (left, right, key):
         if not outer_loop:
             break
         
+        # Store the current left row in case it gets tied to multiple rows on the right
         mi = li
         curr_l = sorted_left[li]
         
+        # Second forever loop from the algorithm
         while True:
+            # While the keys are equal, merge rows and add to the output
             while sorted_left[li].get(key) == sorted_right[ri].get(key):
-                #// Left row and right row are equal
-                #// Add rows to result
                 combined = sorted_left[li].copy()
 
                 for k, v in sorted_right[ri].items():
@@ -63,31 +66,30 @@ def sort_merge_inner (left, right, key):
                 
                 output.append(combined)
 
-                #// Advance to next left row
+                # Go to next left row, to check if it's also equal to right row
                 li += 1
                 
-                #// Check if left row exists
-                if li <= len(sorted_left):
-                    #// Continue with inner forever loop
+                # Only continue while left row actually exists
+                if li < len(sorted_left):
                     break
             
+            # Index up the right row once if possible
             if (ri+1) < len(sorted_right):
-                #// Advance to next right row
                 ri += 1
             else: 
                 outer_loop = False
                 break
-            
+
+            # If the old left row we saved matched the new right row, we need to go back and consider
+            # the old left row and the new right row before moving onwards
             if curr_l.get(key) == sorted_right[ri].get(key):
-                #// Restore left to stored mark
                 li = mi
             else:
-                #// Check if left row exists
+                # If li isn't in the list then something broke big time
                 if not (li < len(sorted_left)):
                     outer_loop = False
                     break
                 else:
-                    #// Continue with outer forever loop
                     break
 
         if not outer_loop:
