@@ -70,7 +70,7 @@ def sort_merge_inner (left, right, key):
                 li += 1
                 
                 # Only continue while left row actually exists
-                if li < len(sorted_left):
+                if not(li < len(sorted_left)):
                     break
             
             # Index up the right row once if possible
