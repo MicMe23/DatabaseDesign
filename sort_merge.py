@@ -33,13 +33,13 @@ def sort_merge_inner (left, right, key):
     while outer_loop:
         while not (sorted_left[li].get(key) == sorted_right[ri].get(key)):
             if sorted_left[li].get(key) < sorted_right[ri].get(key):
-                if (li+1) <= len(sorted_left):
+                if (li+1) < len(sorted_left):
                     li += 1
                 else:
                     outer_loop = False
                     break
             else:
-                if (ri+1) <= len(sorted_right):
+                if (ri+1) < len(sorted_right):
                     ri += 1
                 else: 
                     outer_loop = False
@@ -71,35 +71,29 @@ def sort_merge_inner (left, right, key):
                     #// Continue with inner forever loop
                     break
             
-            if (ri+1) <= len(sorted_right):
+            if (ri+1) < len(sorted_right):
                 #// Advance to next right row
                 ri += 1
             else: 
                 outer_loop = False
                 break
             
-            if not outer_loop:
-                break
-            
-            if curr_l == sorted_right[ri]:
+            if curr_l.get(key) == sorted_right[ri].get(key):
                 #// Restore left to stored mark
                 li = mi
             else:
                 #// Check if left row exists
-                if not (li <= len(sorted_left)):
+                if not (li < len(sorted_left)):
                     outer_loop = False
                     break
                 else:
                     #// Continue with outer forever loop
                     break
 
-            if not outer_loop:
-                break
-
         if not outer_loop:
             break
     
-    output = {index: value for index, value in enumerate(output)}
+    #output = {index: value for index, value in enumerate(output)}
 
     return output
 
