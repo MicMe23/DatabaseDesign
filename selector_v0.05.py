@@ -24,10 +24,10 @@ def skew_summary(sample_df, key_col="PULocationID"):    # Default - intial table
     # Covert NumPy Scalar to float
     vals = counts.values.astype(float)
 
-    max_count = vals[0]    # Picks the top - this is the hottest key
-    median_count = float(np.median(vals))    # Find the median of the array
-    skew_max_med = max_count / max(1.0, median_count)
-    top1_share = max_count / total_rows
+    max_count = vals[0]    # Picks the top - this is the hottest key's frequency count - the highest occurence key
+    median_count = np.median(vals)    # Find the median of the array
+    skew_max_med = max_count / median_count    # looks at the how maximum-freq key is positoned with respect to the median-count key
+    top1_share = max_count / total_rows    # what percent of the hottest key
 
     return {
         "total_rows": int(total_rows),
@@ -48,7 +48,7 @@ tested numbers which is closer to the real-world thresholds
 def is_high_skew(skew_summary_result,
                  skew_threshold=10.0,   # skew_max_med threshold
                  top1_threshold=0.20):  # top1_share threshold i.e. the first is almost 20% of the unique keys - change it to 50% - eventually will test
-                                                      # through several quantiles (like 25%, 50%, 75%) and also for the top-k
+                                                      # through several quantiles (like 25%, 50%, 75%) and also for the top-k (each)
     """
     Decide high skew (True) or low skew (False) using the output of skew_summary()
     Rules (conservative):
