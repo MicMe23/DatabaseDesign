@@ -7,7 +7,7 @@ import time
 import pyarrow.parquet as pq
 
 
-def skew_summary(sample_df, key_col="PULocationID"):
+def skew_summary(sample_df, key_col="PULocationID"):    # Default - intial tables' "PULocationID" as join key
     """
     Returns dictionary with:
       --- total_rows: int
@@ -19,32 +19,37 @@ def skew_summary(sample_df, key_col="PULocationID"):
     print(type(sample_df))
     total_rows = len(sample_df)
     
-    # pandas.Series.value_counts() (or DataFrame column .value_counts()) returns a Series mapping each unique value to the number of times it appears
+    # --- Returns a Series mapping each unique value to the number of times it appears and sorts in descending order
     counts = sample_df[key_col].value_counts().sort_values(ascending=False)
     distinct_keys = counts.size
     # Covert NumPy Scalar to float
     vals = counts.values.astype(float)
 
-    max_count = vals[0]    # Picks the top
-    median_count = float(np.median(vals)) if distinct_keys > 0 else 0.0    # Find the median of the array
-    skew_max_med = max_count / max(1.0, median_count)
-    top1_share = max_count / total_rows
+    max_count = vals[0]    # Picks the top - this is the hottest key's frequency count - the highest occurence key
+    median_count = np.median(vals)    # Find the median of the array
+    skew_max_med = max_count / median_count    # looks at the how maximum-freq key is positoned with respect to the median-count key
+    top1_share = max_count / total_rows    # what percent of the hottest key
 
     return {
         "total_rows": int(total_rows),
         "distinct_keys": int(distinct_keys),
         "skew_max_med": float(skew_max_med),
         "top1_share": float(top1_share),
-        "per_key_counts": counts
+        "per_key_counts": counts    # for testing I have printed this for visually checking for a long, asymmetric tail
     }
 
 
 '''
 CONSERVATVE
+--- We run sample tests on several tables as we go - to determine those thresholds (kind of averaged out) - we will eventually have more
+tested numbers which is closer to the real-world thresholds
+--- This function is to be tested with to avoid changing more of the gorund rules for the actual skew estimator above
+
 '''
 def is_high_skew(skew_summary_result,
                  skew_threshold=10.0,   # skew_max_med threshold
-                 top1_threshold=0.20):  # top1_share threshold
+                 top1_threshold=0.20):  # top1_share threshold i.e. the first is almost 20% of the unique keys - change it to 50% - eventually will test
+                                                      # through several quantiles (like 25%, 50%, 75%) and also for the top-k (each)
     """
     Decide high skew (True) or low skew (False) using the output of skew_summary()
     Rules (conservative):
@@ -52,9 +57,7 @@ def is_high_skew(skew_summary_result,
       --- Otherwise low skew
     Returns boolean.
     """
-    if skew_summary_result.get("total_rows") == 0:
-        return False
-
+    print(skew_summary_result.get("per_key_counts"))
     skew_max_med = skew_summary_result.get("skew_max_med")
     top1_share = skew_summary_result.get("top1_share")
 
@@ -82,14 +85,14 @@ yellow = yellow.sample(min(len(yellow), 50_000), random_state=0)
 green  = green.sample(min(len(green), 50_000), random_state=1)
 
 # Convert to records (list of dicts) for consistency
-left_rows  = yellow.to_dict(orient="records")
-right_rows = green.to_dict(orient="records")
+# left_rows  = yellow.to_dict(orient="records")
+# right_rows = green.to_dict(orient="records")
 
 
 
 """
 Calculate skew summary and pass it to the boolean function to determined if it skewed enough
-Test: available mem = False
+Test: available mem = True
 """
 
 def choose_join(available_memory=True):
@@ -104,7 +107,7 @@ def choose_join(available_memory=True):
     print(len(yellow))
     skew_sum = skew_summary(green)
     is_skewed = is_high_skew(skew_sum)
-    enough_memory = available_memory >= memory_threshold
+    # enough_memory = available_memory >= memory_threshold
 
     # Changed for testing
     enough_memory = True
