@@ -3,6 +3,7 @@ from typing import List, Dict, Iterable
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import time
 import pyarrow.parquet as pq
 
 
@@ -64,12 +65,12 @@ def is_high_skew(skew_summary_result,
 """
 DataFrame processing of the tables --- testing instances
 """
-
+time_start = time.time()
 # (Optional) Load only needed columns to save memory
 # This dataset is massive
-yellow = pq.read_table(Path("highly_skewed_50k_rows.parquet"),
+yellow = pq.read_table(Path("yellow_tripdata_2025-01.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with skews
-green  = pq.read_table(Path("uniformly_distributed_50k_rows.parquet"),
+green  = pq.read_table(Path("green_tripdata_2025-01.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with non-skews - made 2nd columns same to just test
 
 # (Optional) Clean + align types
@@ -118,3 +119,5 @@ def choose_join(available_memory=True):
             return 'sort-merge'
 
 print(choose_join())
+time_end = time.time()
+print("Time taken (s):", time_end - time_start)
