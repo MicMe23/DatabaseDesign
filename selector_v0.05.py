@@ -40,9 +40,96 @@ def skew_summary(sample_df, key_col="PULocationID"):    # Default - intial table
         "per_key_counts": counts    # for testing I have printed this for visually checking for a long, asymmetric tail
     }
 
+def skew_summary2(df, key_col="PULocationID"):
+    counts = df[key_col].value_counts(dropna=False).sort_values(ascending=False)
+    vals = counts.to_numpy(dtype=float)
+    total = vals.sum()
+    if len(vals) == 0 or total == 0:
+        return {
+            "total_rows": 0,
+            "distinct_keys": 0,
+            "skew_max_med": 1.0,
+            "top1_share": 0.0,
+            "per_key_counts": counts
+        }
+    max_count = vals[0]
+    median_count = np.median(vals)
+    skew_max_med = float(max_count / median_count) if median_count > 0 else float('inf')
+    top1_share = float(max_count / total)
+    return {
+        "total_rows": int(total),
+        "distinct_keys": int(counts.size),
+        "skew_max_med": float(skew_max_med),
+        "top1_share": float(top1_share),
+        "per_key_counts": counts
+    }
 
+def join_hotkey_share(left_counts: pd.Series, right_counts: pd.Series) -> float:
+    """
+    Estimate the JOIN output is on one key
+    hotkey_share = max_k (L[k]*R[k]) / sum_k (L[k]*R[k])
+    """
+    # align on common keys only
+    common = left_counts.index.intersection(right_counts.index)
+    if common.empty:
+        return 0.0
+    lc = left_counts.loc[common].to_numpy(dtype=float)
+    rc = right_counts.loc[common].to_numpy(dtype=float)
+    pairwise = lc * rc
+    total_pairs = pairwise.sum()
+    if total_pairs <= 0:
+        return 0.0
+    return float(pairwise.max() / total_pairs)
+
+def is_high_skew_joint(left_sum, right_sum, hot_share,
+                       hot_hi: float = 0.90,
+                       hot_lo: float = 0.30,
+                       use_gray_guard: bool = False):
+    """
+    Decide 'high skew' based on JOIN-AWARE concentration only (temporarily)
+      hot_share = max_k L[k]*R[k] / sum_k L[k]*R[k}
+    Rules:
+      - hot_share >= hot_hi  -> True  (skewed: prefer sort-merge)
+      - hot_share <= hot_lo  -> False (not skewed: prefer hash)
+    """
+    print({"hot_share": hot_share, "hot_hi": hot_hi, "hot_lo": hot_lo})
+    if hot_share >= hot_hi:
+        return True
+    if hot_share <= hot_lo:
+        return False
+
+    if not use_gray_guard:
+        return False
+
+    #(rarely fires)
+    per_side_extreme = (
+        (left_sum["top1_share"] >= 0.75 or left_sum["skew_max_med"] >= 80) and
+        (right_sum["top1_share"] >= 0.75 or right_sum["skew_max_med"] >= 80)
+    )
+    return per_side_extreme
+
+def choose_join2(yellow_df: pd.DataFrame, green_df: pd.DataFrame, key_col="PULocationID",
+                available_memory_bytes=None, memory_threshold_bytes=2 * 1024**3):
+    # summarize both sides
+    y_sum = skew_summary(yellow_df, key_col)
+    g_sum = skew_summary(green_df, key_col)
+
+    # compute hot-key share of the *join output*
+    hot_share = join_hotkey_share(y_sum["per_key_counts"], g_sum["per_key_counts"])
+
+    # make decision based off of hot key
+    high_skew = is_high_skew_joint(y_sum, g_sum, hot_share, hot_hi=0.60, hot_lo=0.30)
+
+    # memory guard (optional for now until fleshed out)
+    #enough_mem = True if available_memory_bytes is None else (available_memory_bytes >= memory_threshold_bytes)
+
+    if high_skew:
+        return "sort-merge"
+    else:
+        return "hash"
+    
 '''
-CONSERVATVE
+CONSERVATIVE
 --- We run sample tests on several tables as we go - to determine those thresholds (kind of averaged out) - we will eventually have more
 tested numbers which is closer to the real-world thresholds
 --- This function is to be tested with to avoid changing more of the gorund rules for the actual skew estimator above
@@ -73,9 +160,9 @@ DataFrame processing of the tables --- testing instances
 time_start = time.time()
 # (Optional) Load only needed columns to save memory
 # This dataset is massive
-yellow = pq.read_table(Path("highly_skewed_50k_rows.parquet"),
+yellow = pq.read_table(Path("skew_L.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with skews
-green  = pq.read_table(Path("green_tripdata_2025-01.parquet"),
+green  = pq.read_table(Path("skew_R.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with non-skews - made 2nd columns same to just test
 
 # (Optional) Clean + align types
@@ -123,9 +210,9 @@ def choose_join(available_memory=True):
         else:
             return 'sort-merge'
         
-#choice = choose_join()
+choice = choose_join2(yellow, green)
 
-choice = 'hash'   # For testing purposes
+#choice = 'sort-merge'   # For testing purposes
 
 if choice == 'hash':
     left_rows  = yellow.to_dict(orient="records")
