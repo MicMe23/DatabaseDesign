@@ -4,6 +4,7 @@ from typing import List, Dict, Iterable
 from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
+import time
 
 def hash_join_inner(left, right, key):
     # Requirements :
@@ -56,5 +57,5 @@ left_rows  = yellow.to_dict(orient="records")
 right_rows = green.to_dict(orient="records")
 
 joins = hash_join_inner(left_rows, right_rows, "PULocationID")
-print("rows joined:", len(joins))
-print(joins[:3])
+#print("rows joined:", len(joins))
+#print(joins[:3])

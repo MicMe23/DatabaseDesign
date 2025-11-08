@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import time
 import pyarrow.parquet as pq
+import sort_merge
+import Hash_join
 
 
 def skew_summary(sample_df, key_col="PULocationID"):    # Default - intial tables' "PULocationID" as join key
@@ -71,14 +73,14 @@ DataFrame processing of the tables --- testing instances
 time_start = time.time()
 # (Optional) Load only needed columns to save memory
 # This dataset is massive
-yellow = pq.read_table(Path("yellow_tripdata_2025-01.parquet"),
+yellow = pq.read_table(Path("highly_skewed_50k_rows.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with skews
 green  = pq.read_table(Path("green_tripdata_2025-01.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with non-skews - made 2nd columns same to just test
 
 # (Optional) Clean + align types
-yellow = yellow.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
-green  = green.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
+#yellow = yellow.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
+#green  = green.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
 
 # (Optional) making this quicker for solo testing
 yellow = yellow.sample(min(len(yellow), 50_000), random_state=0)
@@ -120,7 +122,22 @@ def choose_join(available_memory=True):
             return 'hash'
         else:
             return 'sort-merge'
+        
+#choice = choose_join()
 
-print(choose_join())
+choice = 'hash'   # For testing purposes
+
+if choice == 'hash':
+    left_rows  = yellow.to_dict(orient="records")
+    right_rows = green.to_dict(orient="records")
+    joins = Hash_join.hash_join_inner(left_rows, right_rows, "PULocationID")
+else:
+    left_rows  = yellow.to_dict(orient="records")
+    right_rows = green.to_dict(orient="records")
+    joins = sort_merge.sort_merge_inner(left_rows, right_rows, "PULocationID")
+
 time_end = time.time()
+print(choice)
 print("Time taken (s):", time_end - time_start)
+print("rows joined:", len(joins))
+print(joins[:3])
