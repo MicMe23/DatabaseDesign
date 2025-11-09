@@ -82,7 +82,7 @@ def join_hotkey_share(left_counts: pd.Series, right_counts: pd.Series) -> float:
     return float(pairwise.max() / total_pairs)
 
 def is_high_skew_joint(left_sum, right_sum, hot_share,
-                       hot_hi: float = 0.90,
+                       hot_hi: float = 0.60,
                        hot_lo: float = 0.30,
                        use_gray_guard: bool = False):
     """
