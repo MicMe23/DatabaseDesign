@@ -160,9 +160,9 @@ DataFrame processing of the tables --- testing instances
 time_start = time.time()
 # (Optional) Load only needed columns to save memory
 # This dataset is massive
-yellow = pq.read_table(Path("skew_L.parquet"),
+yellow = pq.read_table(Path("./test_files/highly_skewed_50k_rows_L.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with skews
-green  = pq.read_table(Path("skew_R.parquet"),
+green  = pq.read_table(Path("./test_files/highly_skewed_50k_rows_R.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with non-skews - made 2nd columns same to just test
 
 # (Optional) Clean + align types
@@ -170,8 +170,8 @@ green  = pq.read_table(Path("skew_R.parquet"),
 #green  = green.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
 
 # (Optional) making this quicker for solo testing
-yellow = yellow.sample(min(len(yellow), 50_000), random_state=0)
-green  = green.sample(min(len(green), 50_000), random_state=1)
+yellow = yellow.sample(min(len(yellow), 10_000), random_state=0)
+green  = green.sample(min(len(green), 10_000), random_state=1)
 
 # Convert to records (list of dicts) for consistency
 # left_rows  = yellow.to_dict(orient="records")
@@ -210,9 +210,9 @@ def choose_join(available_memory=True):
         else:
             return 'sort-merge'
         
-choice = choose_join2(yellow, green)
+#choice = choose_join2(yellow, green)
 
-#choice = 'sort-merge'   # For testing purposes
+choice = 'sort-merge'   # For testing purposes
 
 if choice == 'hash':
     left_rows  = yellow.to_dict(orient="records")
@@ -221,7 +221,7 @@ if choice == 'hash':
 else:
     left_rows  = yellow.to_dict(orient="records")
     right_rows = green.to_dict(orient="records")
-    joins = sort_merge.sort_merge_inner(left_rows, right_rows, "PULocationID")
+    joins = sort_merge.sort_merge_inner2(left_rows, right_rows, "PULocationID")
 
 time_end = time.time()
 print(choice)

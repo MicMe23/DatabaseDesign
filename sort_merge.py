@@ -20,9 +20,11 @@ def sort_merge_inner (left, right, key):
     list_right = list(right)
 
     # Sorting step
-    sorted_left = merge_sort(list_left, key)
-    sorted_right = merge_sort(list_right, key)
+    #sorted_left = merge_sort(list_left, key)
+    #sorted_right = merge_sort(list_right, key)
 
+    sorted_left = sorted(list_left, key=lambda x: x.get(key))
+    sorted_right = sorted(list_right, key=lambda x: x.get(key))
     output = []
 
     # Left Index, right index
@@ -100,6 +102,64 @@ def sort_merge_inner (left, right, key):
 
     return output
 
+def sort_merge_inner2(left, right, key):
+    # Requirements :
+    #  - left_rows / right_rows: lists of dicts
+    #  - key exists in both sides; None keys don't match
+    #  - duplicate keys produce the cross product of matches for now.
+    #  returns: list of merged dicts
+
+    # 2nd version
+
+    if (not left) or (not right):
+        return
+ 
+    list_left = list(left)
+    list_right = list(right)
+
+
+    sorted_left = sorted(list_left, key=lambda x: x.get(key))
+    sorted_right = sorted(list_right, key=lambda x: x.get(key))
+
+    output = []
+    li = 0
+    ri = 0
+
+    # logic is same for this phase
+    while li < len(sorted_left) and ri < len(sorted_right):
+
+        left_key = sorted_left[li][key]
+        right_key = sorted_right[ri][key]
+
+        if left_key < right_key:
+            li += 1
+        elif left_key > right_key:
+            ri += 1
+        else:
+            # keys match → cross product block
+            curr_key = left_key
+
+            # collect all matching on left
+            li_start = li
+            while li < len(sorted_left) and sorted_left[li][key] == curr_key:
+                li += 1
+
+            # collect all matching on right
+            ri_start = ri
+            while ri < len(sorted_right) and sorted_right[ri][key] == curr_key:
+                ri += 1
+
+            # cross product (same as before)
+            for l in range(li_start, li):
+                for r in range(ri_start, ri):
+                    combined = sorted_left[l].copy()
+                    for k, v in sorted_right[r].items():
+                        if k != key:
+                            combined[k + ".right"] = v
+                    output.append(combined)
+
+    return output
+
 def merge_sort (unsorted_list, key):
     if len(unsorted_list) <= 1:
         return unsorted_list
@@ -136,26 +196,3 @@ def merge(lhs, rhs, key):
         rhs = rhs[1:]
         
     return result
-
-# (Optional) Load only needed columns to save memory
-# This dataset is massive
-yellow = pq.read_table(Path("yellow_tripdata_2025-01.parquet"),
-                       columns=["PULocationID","fare_amount"]).to_pandas()
-green  = pq.read_table(Path("green_tripdata_2025-01.parquet"),
-                       columns=["PULocationID","trip_distance"]).to_pandas()
-
-# (Optional) Clean + align types
-yellow = yellow.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
-green  = green.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
-
-# (Optional) making this quicker for solo testing
-yellow = yellow.sample(min(len(yellow), 50_000), random_state=0)
-green  = green.sample(min(len(green), 50_000), random_state=1)
-
-# Convert to records (list of dicts) for consistency
-left_rows  = yellow.to_dict(orient="records")
-right_rows = green.to_dict(orient="records")
-
-joins = sort_merge_inner(left_rows, right_rows, "PULocationID")
-#print("rows joined:", len(joins))
-#print(joins[:3])
