@@ -23,8 +23,12 @@ def sort_merge_inner (left, right, key):
     #sorted_left = merge_sort(list_left, key)
     #sorted_right = merge_sort(list_right, key)
 
-    sorted_left = sorted(list_left, key=lambda x: x.get(key))
-    sorted_right = sorted(list_right, key=lambda x: x.get(key))
+    #sorted_left = sorted(list_left, key=lambda x: x.get(key))
+    #sorted_right = sorted(list_right, key=lambda x: x.get(key))
+
+    sorted_left = list(left)
+    sorted_right = list(right)
+
     output = []
 
     # Left Index, right index
@@ -118,8 +122,11 @@ def sort_merge_inner2(left, right, key):
     list_right = list(right)
 
 
-    sorted_left = sorted(list_left, key=lambda x: x.get(key))
-    sorted_right = sorted(list_right, key=lambda x: x.get(key))
+    #sorted_left = sorted(list_left, key=lambda x: x.get(key))
+    #sorted_right = sorted(list_right, key=lambda x: x.get(key))
+
+    sorted_left = list(left)
+    sorted_right = list(right)
 
     output = []
     li = 0
@@ -152,11 +159,75 @@ def sort_merge_inner2(left, right, key):
             # cross product (same as before)
             for l in range(li_start, li):
                 for r in range(ri_start, ri):
+                    
                     combined = sorted_left[l].copy()
                     for k, v in sorted_right[r].items():
                         if k != key:
                             combined[k + ".right"] = v
                     output.append(combined)
+
+    return output
+
+def sort_merge_inner3(left, right, key):
+    # Requirements :
+    #  - left_rows / right_rows: lists of dicts
+    #  - key exists in both sides; None keys don't match
+    #  - duplicate keys produce the cross product of matches for now.
+    #  returns: list of merged dicts
+
+    # 2nd version
+
+    if (not left) or (not right):
+        return
+ 
+    list_left = list(left)
+    list_right = list(right)
+
+
+    sorted_left = sorted(list_left, key=lambda x: x.get(key))
+    sorted_right = sorted(list_right, key=lambda x: x.get(key))
+
+    #sorted_left = list(left)
+    #sorted_right = list(right)
+    
+    output = []
+    li = 0
+    ri = 0
+
+    # logic is same for this phase
+    while li < len(sorted_left) and ri < len(sorted_right):
+
+        left_key = sorted_left[li][key]
+        right_key = sorted_right[ri][key]
+
+        if left_key < right_key:
+            li += 1
+        elif left_key > right_key:
+            ri += 1
+        else:
+            # keys match → cross product block
+            curr_key = left_key
+
+            # collect all matching on left
+            li_start = li
+            while li < len(sorted_left) and sorted_left[li][key] == curr_key:
+                li += 1
+
+            # collect all matching on right
+            ri_start = ri
+            while ri < len(sorted_right) and sorted_right[ri][key] == curr_key:
+                ri += 1
+
+            # cross product (same as before)
+            for l in range(li_start, li):
+                for r in range(ri_start, ri):
+                    
+                    #combined = sorted_left[l].copy()
+                    r_tuple = sorted_right[r]
+                    l_tuple = sorted_left[l]
+                    joined = {**l_tuple, **r_tuple}
+                    
+                    output.append(joined)
 
     return output
 
