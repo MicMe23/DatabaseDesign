@@ -4,6 +4,7 @@ from typing import List, Dict, Iterable
 from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
+import time
 
 def hash_join_inner(left, right, key):
     # Requirements :
@@ -36,25 +37,4 @@ def hash_join_inner(left, right, key):
                 out.append(joined)
     return out
 
-# (Optional) Load only needed columns to save memory
-# This dataset is massive
-yellow = pq.read_table(Path("yellow_tripdata_2025-01.parquet"),
-                       columns=["PULocationID","fare_amount"]).to_pandas()
-green  = pq.read_table(Path("green_tripdata_2025-01.parquet"),
-                       columns=["PULocationID","trip_distance"]).to_pandas()
-
-# (Optional) Clean + align types
-yellow = yellow.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
-green  = green.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
-
-# (Optional) making this quicker for solo testing
-yellow = yellow.sample(min(len(yellow), 50_000), random_state=0)
-green  = green.sample(min(len(green), 50_000), random_state=1)
-
-# Convert to records (list of dicts) for consistency
-left_rows  = yellow.to_dict(orient="records")
-right_rows = green.to_dict(orient="records")
-
-joins = hash_join_inner(left_rows, right_rows, "PULocationID")
-print("rows joined:", len(joins))
-print(joins[:3])
+    # modify probe for differnt joins

@@ -12,10 +12,19 @@ def generate_skewed_parquet():
     # 95% of the rows will have IDs selected with probaboilites (defined with p) from a set of {16, 17, 18, 19, 20} (any random 5 IDs)
     common_PULocations = np.random.choice(range(16, 21),
             size=int(num_of_rows * 0.95), p=[0.5, 0.2, 0.1, 0.1, 0.1])
+    
+    #common_PULocations = np.full(int(num_of_rows * 0.60), 777)
+
 
     # Select randomly from a range of 1000 - 9999 for the remainder of the 5% pickup locations
     rear_PULocations = np.random.choice(range(1000, 9999),
             size=int(num_of_rows * 0.05), replace=False)  # I chose no repeats i.e. replace=False
+
+    # In BOTH skewed file generations
+    #rear_PULocations = np.random.choice(
+    #size=int(num_of_rows * 0.40),
+    #replace=True                # allow repeats so overlap occurs
+#)
 
     # Now, concatenate both of them and shuffle them - loop - 10 times
     puloc_ids = np.concatenate([common_PULocations, rear_PULocations])
@@ -30,7 +39,7 @@ def generate_skewed_parquet():
                       'fare_amount': fare_amt})
 
     # This will write the file in the current directory (pwd)
-    file_name = 'highly_skewed_50k_rows.parquet'
+    file_name = 'highly_skewed_50k_rows_L.parquet'
     pq.write_table(pa.Table.from_pandas(df), file_name)
 
 
@@ -48,6 +57,12 @@ def generate_unif_dist_parquet():
     # Making the dataframe and then turning it into a parquet file
     df = pd.DataFrame({'PULocationID': puloc_ids,
                       'fare_amount': fare_amt})
+    
+    ###############################################
+    # added by michael for testing sorting overhead
+    # Sorting the dataframe based on PULocationID
+    df = df.sort_values(by="PULocationID")
+
 
     # This will write the file in the current directory (pwd)
     file_name = 'uniformly_distributed_50k_rows.parquet'
