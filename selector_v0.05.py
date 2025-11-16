@@ -6,7 +6,8 @@ import pandas as pd
 import time
 import pyarrow.parquet as pq
 import sort_merge
-import Hash_join
+#import Hash_join
+import Hash_join2
 
 
 def skew_summary(sample_df, key_col="PULocationID"):    # Default - intial tables' "PULocationID" as join key
@@ -157,12 +158,11 @@ def is_high_skew(skew_summary_result,
 """
 DataFrame processing of the tables --- testing instances
 """
-time_start = time.time()
 # (Optional) Load only needed columns to save memory
 # This dataset is massive
-yellow = pq.read_table(Path("./test_files/highly_skewed_50k_rows_L.parquet"),
+yellow = pq.read_table(Path("./test_files/2skewed_150k_rows_L.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with skews
-green  = pq.read_table(Path("./test_files/highly_skewed_50k_rows_R.parquet"),
+green  = pq.read_table(Path("./test_files/2skewed_150k_rows_R.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with non-skews - made 2nd columns same to just test
 
 # (Optional) Clean + align types
@@ -170,13 +170,13 @@ green  = pq.read_table(Path("./test_files/highly_skewed_50k_rows_R.parquet"),
 #green  = green.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
 
 # (Optional) making this quicker for solo testing
-yellow = yellow.sample(min(len(yellow), 50_000), random_state=0)
-green  = green.sample(min(len(green), 50_000), random_state=1)
+yellow = yellow.sample(min(len(yellow), 20000), random_state=0)
+green  = green.sample(min(len(green), 20000), random_state=0)
 
-# Convert to records (list of dicts) for consistency
-# left_rows  = yellow.to_dict(orient="records")
-# right_rows = green.to_dict(orient="records")
+#yellow = yellow.sort_values("PULocationID")
+#green  = green.sort_values("PULocationID")
 
+time_start = time.time()
 
 
 """
@@ -212,20 +212,23 @@ def choose_join(available_memory=True):
         
 #choice = choose_join2(yellow, green)
 
-#choice = 'sort-merge'   # For testing purposes
-choice = 'hash'
+choice = 'hash'   # For testing purposes
+print(len(yellow))
+print(len(green))
 
 if choice == 'hash':
+    # print(type(yellow))       # comes in as Dataframe
     left_rows  = yellow.to_dict(orient="records")
     right_rows = green.to_dict(orient="records")
-    joins = Hash_join.hash_join_inner(left_rows, right_rows, "PULocationID")
+    # print(type(left_rows))        # it's a list of dictionaries 
+    joins = Hash_join2.hash_join_inner(left_rows, right_rows, "PULocationID")
 else:
     left_rows  = yellow.to_dict(orient="records")
     right_rows = green.to_dict(orient="records")
-    joins = sort_merge.sort_merge_inner2(left_rows, right_rows, "PULocationID")
+    joins = sort_merge.sort_merge_inner3(left_rows, right_rows, "PULocationID")
 
 time_end = time.time()
 print(choice)
-print("Time taken (s):", time_end - time_start)
-print("rows joined:", len(joins))
+print("Time taken (s): (main)", time_end - time_start)
+print("rows joined: (main)", len(joins))
 print(joins[:3])
