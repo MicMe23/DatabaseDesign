@@ -13,12 +13,12 @@ def generate_skewed_parquet():
     #common_PULocations = np.random.choice(range(16, 21),
     #        size=int(num_of_rows * 0.95), p=[0.5, 0.2, 0.1, 0.1, 0.1])
     
-    common_PULocations = np.full(int(num_of_rows * 0.6), 777)
+    common_PULocations = np.full(int(num_of_rows * 0.1), 777)
 
 
     # Select randomly from a range of 10000 - 15000 for the pickup locations
-    rear_PULocations = np.random.choice(range(3000, 10000),
-            size=int(num_of_rows * 0.4), replace=True)  # I chose no repeats i.e. replace=False
+    rear_PULocations = np.random.choice(range(100, 1000),
+            size=int(num_of_rows * 0.9), replace=True)  # I chose no repeats i.e. replace=False
 
     # In BOTH skewed file generations
     #rear_PULocations = np.random.choice(
@@ -39,7 +39,7 @@ def generate_skewed_parquet():
                       'fare_amount': fare_amt})
 
     # This will write the file in the current directory (pwd)
-    file_name = '6skewed_150k_rows_R.parquet'
+    file_name = 'lat_skew_01_150k_rows_R.parquet'
     pq.write_table(pa.Table.from_pandas(df), file_name)
 
 

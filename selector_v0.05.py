@@ -82,9 +82,11 @@ def join_hotkey_share(left_counts: pd.Series, right_counts: pd.Series) -> float:
         return 0.0
     return float(pairwise.max() / total_pairs)
 
+
+
 def is_high_skew_joint(left_sum, right_sum, hot_share,
-                       hot_hi: float = 0.60,
-                       hot_lo: float = 0.30,
+                       #hot_hi: float = 0.60,
+                       hot_lo: float = 0.70,
                        use_gray_guard: bool = False):
     """
     Decide 'high skew' based on JOIN-AWARE concentration only (temporarily)
@@ -93,21 +95,35 @@ def is_high_skew_joint(left_sum, right_sum, hot_share,
       - hot_share >= hot_hi  -> True  (skewed: prefer sort-merge)
       - hot_share <= hot_lo  -> False (not skewed: prefer hash)
     """
-    print({"hot_share": hot_share, "hot_hi": hot_hi, "hot_lo": hot_lo})
-    if hot_share >= hot_hi:
-        return True
     if hot_share <= hot_lo:
         return False
 
-    if not use_gray_guard:
-        return False
-
-    #(rarely fires)
+    # if not use_gray_guard:
+    #     return False
     per_side_extreme = (
         (left_sum["top1_share"] >= 0.75 or left_sum["skew_max_med"] >= 80) and
         (right_sum["top1_share"] >= 0.75 or right_sum["skew_max_med"] >= 80)
     )
     return per_side_extreme
+
+'''
+Estimate the memory for each Join Scenarios
+'''
+def estimated_mem(skew_summary, join_hot_key, left_table_rows, right_table_rows, 
+                  row_bytes_estimate=200,
+                  safety_factor=1.5):
+
+    smaller_side_rows = min(len(left_table_rows), len(right_table_rows))	# select the smaller side/ build side amongst the two tables
+    rel_size = smaller_side_rows * row_bytes_estimate	# relative size of the smaller side - total rows size
+
+    #top1 = skew_summary.get("top1_share")	# Get the hottest-key share
+    top1 = join_hot_key
+    hot_bucket_extra = smaller_side_rows * top1 * row_bytes_estimate
+    est_needed = (rel_size + hot_bucket_extra) * safety_factor
+
+    return est_needed
+
+
 
 def choose_join2(yellow_df: pd.DataFrame, green_df: pd.DataFrame, key_col="PULocationID",
                 available_memory_bytes=None, memory_threshold_bytes=2 * 1024**3):
@@ -119,14 +135,22 @@ def choose_join2(yellow_df: pd.DataFrame, green_df: pd.DataFrame, key_col="PULoc
     hot_share = join_hotkey_share(y_sum["per_key_counts"], g_sum["per_key_counts"])
 
     # make decision based off of hot key
-    high_skew = is_high_skew_joint(y_sum, g_sum, hot_share, hot_hi=0.60, hot_lo=0.30)
+    high_skew = is_high_skew_joint(y_sum, g_sum, hot_share, hot_lo=0.75)
 
     # memory guard (optional for now until fleshed out)
-    #enough_mem = True if available_memory_bytes is None else (available_memory_bytes >= memory_threshold_bytes)
+    # enough_mem = True if available_memory_bytes is None else (available_memory_bytes >= memory_threshold_bytes)
 
+    """
+      * If data is too skewed ---> sort-merge
+      * If skewed AND needs a lot of memory ---> sort-merge
+      * If low skew ---> hash join
+      * If low skew but too much memory (i.e., not enough memory) ---> sort-merge
+    """
     if high_skew:
         return "sort-merge"
     else:
+        if estimated_mem(y_sum, hot_share, yellow_df, green_df) > 20000000:
+            return "sort_merge"
         return "hash"
     
 '''
@@ -157,12 +181,13 @@ def is_high_skew(skew_summary_result,
 
 """
 DataFrame processing of the tables --- testing instances
+Tested first with NYC TaxiCab data - change accordingly the parquet file names
 """
 # (Optional) Load only needed columns to save memory
 # This dataset is massive
-yellow = pq.read_table(Path("./test_files/2skewed_150k_rows_L.parquet"),
+yellow = pq.read_table(Path("./test_files/yellow_tripdata_2025-01.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with skews
-green  = pq.read_table(Path("./test_files/2skewed_150k_rows_R.parquet"),
+green  = pq.read_table(Path("./test_files/green_tripdata_2025-01.parquet"),
                        columns=["PULocationID","fare_amount"]).to_pandas()    # Changed it to test with non-skews - made 2nd columns same to just test
 
 # (Optional) Clean + align types
@@ -170,8 +195,8 @@ green  = pq.read_table(Path("./test_files/2skewed_150k_rows_R.parquet"),
 #green  = green.dropna(subset=["PULocationID"]).astype({"PULocationID":"int64"})
 
 # (Optional) making this quicker for solo testing
-yellow = yellow.sample(min(len(yellow), 20000), random_state=0)
-green  = green.sample(min(len(green), 20000), random_state=0)
+yellow = yellow.sample(min(len(yellow), 50000), random_state=0)
+green  = green.sample(min(len(green), 50000), random_state=0)
 
 #yellow = yellow.sort_values("PULocationID")
 #green  = green.sort_values("PULocationID")
@@ -193,7 +218,7 @@ def choose_join(available_memory=True):
     """
     memory_threshold = 2 * 1024**3      # 2 GiB
 
-    print(len(yellow))
+    #print(len(yellow))
     skew_sum = skew_summary(green)
     is_skewed = is_high_skew(skew_sum)
     # enough_memory = available_memory >= memory_threshold
@@ -210,11 +235,17 @@ def choose_join(available_memory=True):
         else:
             return 'sort-merge'
         
-#choice = choose_join2(yellow, green)
+        
+        
+# Test Portion --->
+choice = choose_join2(yellow, green)
+print(choice)
+print("debug point")
 
-choice = 'hash'   # For testing purposes
-print(len(yellow))
-print(len(green))
+
+# choice = 'sort-merge'   # For testing purposes
+# print(len(yellow))
+# print(len(green))
 
 if choice == 'hash':
     # print(type(yellow))       # comes in as Dataframe
@@ -230,5 +261,3 @@ else:
 time_end = time.time()
 print(choice)
 print("Time taken (s): (main)", time_end - time_start)
-print("rows joined: (main)", len(joins))
-print(joins[:3])

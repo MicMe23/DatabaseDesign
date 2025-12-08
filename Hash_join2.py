@@ -98,8 +98,6 @@ def hash_join_inner(left, right, key, mem_limit_bytes=4 * 1024**3, spill_buckets
             #in_memory_H.clear()
 
     end = time.time()
-    print(len(in_memory_H))
-    print(end - start)
 
     # after building we may have some spill files and some rows in the in_memory_H
     # out_path is the path where the joined rows are written - one large file for now with disk spillage rows
